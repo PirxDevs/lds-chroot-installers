@@ -99,4 +99,4 @@ compress_chroot () {
 }
 
 install_pld_chroot "pld.x64" "conf/pld.pkgs" "x86_64"
-compress_chroot "pld.x64" "pld.pkgs"
+compress_chroot "pld.x64" "pld"
