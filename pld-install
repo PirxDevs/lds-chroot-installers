@@ -81,10 +81,10 @@ EOF
   chroot ${chroot_dir} poldek --noask --upgrade --force -v udev 2>&1 | tee -a ${build_root}/logs/pld.${3}.poldek-install.log
   chroot ${chroot_dir} usermod -s /bin/bash root 1>/dev/null 2>&1
   poldek --conf=${build_root}/tmp/pld.conf --clean 1>/dev/null 2>&1
-  rm -rf ${chroot_dir}/{root,run}/{*,.*}
-  cp -r ${chroot_dir}/etc/skel/{*,.*} ${chroot_dir}/root/
+  rm -rf ${chroot_dir}/{root,run}/{*,.[a-zA-Z0-9]*}
+  cp -r ${chroot_dir}/etc/skel/{*,.[a-zA-Z0-9]*} ${chroot_dir}/root/
   chmod 700 ${chroot_dir}/root/tmp
-  chmod 600 ${chroot_dir}/root/.*
+  chmod 600 ${chroot_dir}/root/.[a-zA-Z0-9]*
   echo -n "" > ${chroot_dir}/etc/resolv.conf
   rm -f ${build_root}/tmp/pld.conf
 }
