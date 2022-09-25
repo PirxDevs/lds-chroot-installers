@@ -1,0 +1,102 @@
+#!/bin/bash
+
+# Copyright (C) 2018-2022 Pirx Developers - https://pirx.dev/
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+script_path=$(realpath "${0}")
+build_root=$(dirname "${script_path}")
+mkdir -p "${build_root}"/{chroots,logs,tmp} 1>/dev/null 2>&1
+
+bind_mounts () {
+  for mpoint in "/dev" "/dev/pts" "/proc" "/run" "/sys"; do
+    if ! test -d ${1}/${mpoint}; then
+      mkdir ${1}/${mpoint}
+    fi
+    mount ${mpoint} ${1}/${mpoint} -o bind
+  done
+}
+
+bind_umounts () {
+  for mpoint in "/dev/pts" "/dev" "/proc" "/run" "/sys"; do
+    umount ${1}/${mpoint}
+  done
+}
+
+install_tld_chroot () {
+  chroot_dir="${build_root}/chroots/${1}"
+  rm -rf "${chroot_dir}"
+  mkdir "${chroot_dir}"
+  cat >${build_root}/tmp/tld.conf <<EOF
+[fetcher]
+proto = http,ftp,https
+cmd   = wget -N --dot-style=binary -P %d %Pn
+
+[global]
+pm command = /usr/lib/poldek/pm-command.sh
+cachedir = ${build_root}/tmp/poldek
+
+[source]
+type   = pndir
+name   = tld
+path   = http://ftp1.tld-linux.org/TLD/stable/main/${3}/RPMS/
+
+[source]
+type   = pndir
+name   = tld
+path   = http://ftp1.tld-linux.org/TLD/stable/main/noarch/RPMS/
+EOF
+  echo "Updating poldek indexes"
+  rm -rf ${build_root}/tmp/poldek/*
+  poldek --conf=${build_root}/tmp/tld.conf --clean --upa 2>&1 | tee ${build_root}/logs/tld.${3}.poldek-install.log
+  if [ $? -ne 0 ]; then
+    echo "Error: unable to update poldek indexes"
+    exit 1
+  fi
+  echo "Running installation"
+  bind_mounts ${chroot_dir}
+  poldek --conf=${build_root}/tmp/tld.conf --install-dist=${chroot_dir} --noask --install -v -h rpm poldek tzdata tzdata-zoneinfo 2>&1 | tee -a ${build_root}/logs/tld.${3}.poldek-install.log
+  if [ $? -ne 0 ]; then
+    echo "Error: installation has failed"
+    bind_umounts ${chroot_dir}
+    exit 1
+  fi
+  rm -f ${chroot_dir}/var/lib/rpm/__db*
+  chroot ${chroot_dir} rpm --rebuilddb
+  echo "nameserver 8.8.8.8" > ${chroot_dir}/etc/resolv.conf
+  ln -s /usr/share/zoneinfo/Etc/UTC ${chroot_dir}/etc/localtime
+  chroot ${chroot_dir} poldek --noask --install -v $(cat ${2} | grep -v -E "^#" 2>/dev/null) 2>&1 | tee -a ${build_root}/logs/tld.${3}.poldek-install.log
+  chroot ${chroot_dir} poldek --noask --upgrade --force -v shadow 2>&1 | tee -a ${build_root}/logs/tld.${3}.poldek-install.log
+  bind_umounts ${chroot_dir}
+  chroot ${chroot_dir} poldek --noask --upgrade --force -v udev 2>&1 | tee -a ${build_root}/logs/tld.${3}.poldek-install.log
+  chroot ${chroot_dir} usermod -s /bin/bash root 1>/dev/null 2>&1
+  poldek --conf=${build_root}/tmp/tld.conf --clean 1>/dev/null 2>&1
+  rm -rf ${chroot_dir}/{root,run}/{*,.*} ${chroot_dir}/boot/initramfs-*
+  cp -r ${chroot_dir}/etc/skel/{*,.*} ${chroot_dir}/root/
+  chmod 700 ${chroot_dir}/root/tmp
+  chmod 600 ${chroot_dir}/root/.*
+  echo -n "" > ${chroot_dir}/etc/resolv.conf
+  rm -f ${build_root}/tmp/tld.conf
+}
+
+compress_chroot () {
+  echo "Compressing chroot ${1} into ${2}.tar.xz"
+  chroot_dir="${build_root}/chroots"
+  rm -f "${chroot_dir}/${2}.tar.xz"
+  cd "${chroot_dir}/${1}"
+  tar Jcf "${chroot_dir}/${2}.tar.xz" * --numeric-owner
+  cd "${build_root}"
+}
+
+install_tld_chroot "tld.x64" "tld.pkgs" "x86_64"
+compress_chroot "tld.x64" "tld"

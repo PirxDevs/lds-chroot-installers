@@ -1,0 +1,161 @@
+#!/bin/bash
+
+# Copyright (C) 2018-2022 Pirx Developers - https://pirx.dev/
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+script_path=$(realpath "${0}")
+build_root=$(dirname "${script_path}")
+mkdir -p "${build_root}"/{chroots,logs,tmp} 1>/dev/null 2>&1
+
+install_deb_chroot () {
+  if [ "${1}" = "debian" ]; then
+    deb_mirror="http://ftp.debian.org/debian"
+    deb_dist="${2}"
+    deb_components="main,contrib,non-free"
+    deb_exclude="rsyslog"
+  elif [ "${1}" = "devuan" ]; then
+    deb_mirror="http://pkgmaster.devuan.org/merged"
+    deb_dist="${2}"
+    deb_components="main,contrib,non-free"
+    deb_exclude="rsyslog,usr-is-merged"
+  elif [ "${1}" = "ubuntu" ]; then
+    deb_mirror="http://archive.ubuntu.com/ubuntu"
+    deb_dist="${2}"
+    deb_components="main,restricted,universe,multiverse"
+    deb_exclude="apport,rsyslog,linux-image-generic"
+  fi
+  chroot_dir=${build_root}/chroots/${3}
+  rm -rf "${chroot_dir}"
+  echo "Running installation"
+  LC_ALL=POSIX LANG=POSIX debootstrap \
+    --variant=minbase \
+    --no-merged-usr \
+    --components="${deb_components}" \
+    --include="$(sed ':a;N;$!ba;s/\n/,/g;' ${4} 2>/dev/null)" \
+    --exclude="${deb_exclude}" \
+    --arch=${5} \
+    ${deb_dist} \
+    ${chroot_dir} \
+    ${deb_mirror} \
+    2>&1 | tee ${build_root}/logs/${3}.install.log
+  for mpoint in "/dev" "/dev/pts" "/proc" "/sys"; do
+    echo "Binding ${mpoint}"
+    mount ${mpoint} ${chroot_dir}/${mpoint} -o bind
+  done
+  if ! test -d ${chroot_dir}/root/tmp; then
+    mkdir -p ${chroot_dir}/root/tmp
+  fi
+  echo "Upgrading system"
+  cp -f ${1}-${2}.apt.conf ${chroot_dir}/etc/apt/sources.list 2>/dev/null
+  LC_ALL=POSIX LANG=POSIX chroot ${chroot_dir} apt-get update \
+    2>&1 | tee ${build_root}/logs/${3}.apt.indexes.log
+  for binary in "/sbin/initctl" "/sbin/start-stop-daemon" "/usr/sbin/invoke-rc.d"; do
+    LC_ALL=POSIX LANG=POSIX chroot ${chroot_dir} dpkg-divert --add --rename --local ${binary}
+    ln -s /bin/true ${chroot_dir}/${binary} 2>/dev/null
+  done
+  LC_ALL=POSIX LANG=POSIX DEBIAN_FRONTEND=noninteractive \
+    chroot ${chroot_dir} apt-get -q -y -o Dpkg::Options::="--force-confdef" \
+    -o Dpkg::Options::="--force-confold" --allow-unauthenticated --allow-downgrades \
+    --allow-remove-essential --allow-change-held-packages dist-upgrade \
+    2>&1 | tee ${build_root}/logs/${3}.apt.upgrade.log
+  if [ "${1}" = "debian" ]; then
+    if [ "${6}" = "sd" ]; then
+      deb_init="systemd-sysv"
+    else
+      deb_init="sysvinit-core"
+    fi
+  elif [ "${1}" = "devuan" ]; then
+    deb_init="sysvinit-core"
+  elif [ "${1}" = "ubuntu" ]; then
+    deb_init="systemd-sysv"
+  fi
+  echo "Installing init system"
+  LC_ALL=POSIX LANG=POSIX DEBIAN_FRONTEND=noninteractive \
+    chroot ${chroot_dir} apt-get -q -y -o Dpkg::Options::="--force-confdef" \
+    -o Dpkg::Options::="--force-confold" --allow-unauthenticated --allow-downgrades \
+    --allow-remove-essential --allow-change-held-packages install ${deb_init} \
+    2>&1 | tee ${build_root}/logs/${3}.init.install.log
+  if [ "${2}" = "debian" ] && [ "${deb_init}" != "systemd-sysv" ]; then
+    echo "Removing systemd"
+    LC_ALL=POSIX LANG=POSIX DEBIAN_FRONTEND=noninteractive \
+      chroot ${chroot_dir} apt-get -q -y -o Dpkg::Options::="--force-confdef" \
+      -o Dpkg::Options::="--force-confold" --allow-unauthenticated --allow-downgrades \
+      --allow-remove-essential --allow-change-held-packages remove --purge --auto-remove \
+      systemd systemd-shim \
+      2>&1 | tee -a ${build_root}/logs/${3}.init.install.log
+  fi
+  if [ "${1}" = "debian" ] || [ "${1}" = "devuan" ]; then
+    if [ "${5}" = "amd64" ]; then
+      deb_kernel="linux-image-amd64"
+    elif [ "${5}" = "i386" ]; then
+      deb_kernel="linux-image-686-pae"
+    fi
+  elif [ "${1}" = "ubuntu" ]; then
+    deb_kernel="linux-image-generic"
+  fi
+  echo "Installing kernel"
+  LC_ALL=POSIX LANG=POSIX DEBIAN_FRONTEND=noninteractive \
+    chroot ${chroot_dir} apt-get -q -y -o Dpkg::Options::="--force-confdef" \
+    -o Dpkg::Options::="--force-confold" --allow-unauthenticated --allow-downgrades \
+    --allow-remove-essential --allow-change-held-packages install ${deb_kernel} \
+    2>&1 | tee ${build_root}/logs/${3}.kernel.install.log
+  echo "Cleaning apt and packages"
+  LC_ALL=POSIX LANG=POSIX DEBIAN_FRONTEND=noninteractive \
+    chroot ${chroot_dir} apt-get -q -y -o Dpkg::Options::="--force-confdef" \
+    -o Dpkg::Options::="--force-confold" --allow-unauthenticated --allow-downgrades \
+    --allow-remove-essential --allow-change-held-packages --purge autoremove \
+    2>&1 | tee ${build_root}/logs/${3}.apt.autoremove.log
+  LC_ALL=POSIX LANG=POSIX DEBIAN_FRONTEND=noninteractive \
+    chroot ${chroot_dir} apt-get -q -y -o Dpkg::Options::="--force-confdef" \
+    -o Dpkg::Options::="--force-confold" --allow-unauthenticated --allow-downgrades \
+    --allow-remove-essential --allow-change-held-packages clean all \
+    2>&1 | tee ${build_root}/logs/${3}.apt.clean.log
+  for binary in "/sbin/initctl" "/sbin/start-stop-daemon" "/usr/sbin/invoke-rc.d"; do
+    rm -f ${chroot_dir}/${binary} 2>/dev/null
+    LC_ALL=POSIX LANG=POSIX chroot ${chroot_dir} dpkg-divert --remove --rename ${binary}
+  done
+  for mpoint in "/dev/pts" "/dev" "/proc" "/sys"; do
+    echo "Unbinding ${mpoint}"
+    umount ${chroot_dir}/${mpoint}
+  done
+  rm -rf ${chroot_dir}/run/* ${chroot_dir}/boot/initrd*
+}
+
+compress_chroot () {
+  echo "Compressing chroot ${1} into ${2}.tar.xz"
+  chroot_dir="${build_root}/chroots"
+  rm -f "${chroot_dir}/${2}.tar.xz"
+  cd "${chroot_dir}/${1}"
+  tar Jcvf "${chroot_dir}/${2}.tar.xz" * --numeric-owner
+  cd "${build_root}"
+}
+
+install_deb_chroot "debian" "buster" "debian-buster.x64" "debian-buster.pkgs" "amd64"
+compress_chroot "debian-buster.x64" "debian-buster"
+install_deb_chroot "debian" "buster" "debian-buster-sd.x64" "debian-buster.pkgs" "amd64" "sd"
+compress_chroot "debian-buster-sd.x64" "debian-buster"
+install_deb_chroot "debian" "bullseye" "debian-bullseye.x64" "debian-bullseye.pkgs" "amd64"
+compress_chroot "debian-bullseye.x64" "debian-bullseye"
+install_deb_chroot "debian" "bullseye" "debian-bullseye-sd.x64" "debian-bullseye.pkgs" "amd64" "sd"
+compress_chroot "debian-bullseye-sd.x64" "debian-bullseye"
+install_deb_chroot "devuan" "beowulf" "devuan-beowulf.x64" "devuan-beowulf.pkgs" "amd64"
+compress_chroot "devuan-beowulf.x64" "devuan-beowulf"
+install_deb_chroot "devuan" "chimaera" "devuan-chimaera.x64" "devuan-chimaera.pkgs" "amd64"
+compress_chroot "devuan-chimaera.x64" "devuan-chimaera"
+install_deb_chroot "ubuntu" "bionic" "ubuntu-bionic.x64" "ubuntu-bionic.pkgs" "amd64"
+compress_chroot "ubuntu-bionic.x64" "ubuntu-bionic"
+install_deb_chroot "ubuntu" "focal" "ubuntu-focal.x64" "ubuntu-focal.pkgs" "amd64"
+compress_chroot "ubuntu-focal.x64" "ubuntu-focal"
+install_deb_chroot "ubuntu" "jammy" "ubuntu-jammy.x64" "ubuntu-jammy.pkgs" "amd64"
+compress_chroot "ubuntu-jammy.x64" "ubuntu-jammy"
