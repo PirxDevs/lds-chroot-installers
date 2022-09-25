@@ -137,7 +137,7 @@ compress_chroot () {
   chroot_dir="${build_root}/chroots"
   rm -f "${chroot_dir}/${2}.tar.xz"
   cd "${chroot_dir}/${1}"
-  tar Jcvf "${chroot_dir}/${2}.tar.xz" * --numeric-owner
+  tar Jcf "${chroot_dir}/${2}.tar.xz" * --numeric-owner
   cd "${build_root}"
 }
 
