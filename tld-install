@@ -98,5 +98,5 @@ compress_chroot () {
   cd "${build_root}"
 }
 
-install_tld_chroot "tld.x64" "tld.pkgs" "x86_64"
+install_tld_chroot "tld.x64" "conf/tld.pkgs" "x86_64"
 compress_chroot "tld.x64" "tld"

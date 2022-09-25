@@ -98,5 +98,5 @@ compress_chroot () {
   cd "${build_root}"
 }
 
-install_pld_chroot "pld.x64" "pld.pkgs" "x86_64"
+install_pld_chroot "pld.x64" "conf/pld.pkgs" "x86_64"
 compress_chroot "pld.x64" "pld.pkgs"
