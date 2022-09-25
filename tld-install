@@ -87,6 +87,7 @@ EOF
   chmod 600 ${chroot_dir}/root/.[a-zA-Z0-9]*
   echo -n "" > ${chroot_dir}/etc/resolv.conf
   rm -f ${build_root}/tmp/tld.conf
+  rm -f ${build_root}/var/lib/rpm/__db.*
 }
 
 compress_chroot () {
