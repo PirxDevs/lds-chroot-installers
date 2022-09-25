@@ -130,6 +130,9 @@ install_deb_chroot () {
     umount ${chroot_dir}/${mpoint}
   done
   rm -rf ${chroot_dir}/run/* ${chroot_dir}/boot/initrd*
+  rm -rf ${chroot_dir}/etc/{{group,gshadow,passwd,shadow}-,resolvconf/resolv.conf.d/original,ssh/ssh_host_*}
+  rm -rf ${chroot_dir}/var/lib/apt/lists/*{InRelease,Packages,Sources,Translation*}
+  rm -rf ${chroot_dir}/var/log/{apt/*,{alternatives,bootstrap,dpkg}.log}
 }
 
 compress_chroot () {
