@@ -177,7 +177,3 @@ install_deb_chroot "devuan" "chimaera" "devuan-chimaera.x86" "conf/devuan-chimae
 compress_chroot "devuan-chimaera.x86" "devuan-chimaera.x86"
 install_deb_chroot "ubuntu" "bionic" "ubuntu-bionic.x86" "conf/ubuntu-bionic.pkgs" "i386"
 compress_chroot "ubuntu-bionic.x86" "ubuntu-bionic.x86"
-install_deb_chroot "ubuntu" "focal" "ubuntu-focal.x86" "conf/ubuntu-focal.pkgs" "i386"
-compress_chroot "ubuntu-focal.x86" "ubuntu-focal.x86"
-install_deb_chroot "ubuntu" "jammy" "ubuntu-jammy.x86" "conf/ubuntu-jammy.pkgs" "i386"
-compress_chroot "ubuntu-jammy.x86" "ubuntu-jammy.x86"
