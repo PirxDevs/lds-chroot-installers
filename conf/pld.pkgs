@@ -48,6 +48,8 @@ kmod
 ldconfig
 less
 lftp
+linux-firmware
+linux-firmware-amd
 login
 logrotate
 losetup
@@ -57,6 +59,7 @@ man-db
 man-pages
 mc
 mdadm
+microcode-data-intel
 mingetty
 mtr
 openssh-clients
