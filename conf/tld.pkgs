@@ -28,7 +28,6 @@ fsck
 gawk
 gdisk
 glibc
-glibc-ld
 glibc-localedb-all
 grep
 grub2
@@ -47,6 +46,7 @@ issue
 kbd
 kernel-5.10
 kmod
+ldconfig
 less
 lftp
 login
