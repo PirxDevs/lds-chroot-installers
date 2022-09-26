@@ -100,4 +100,6 @@ compress_chroot () {
 }
 
 install_tld_chroot "tld.x64" "conf/tld.pkgs" "x86_64"
-compress_chroot "tld.x64" "tld"
+compress_chroot "tld.x64" "tld.x64"
+install_tld_chroot "tld.x86" "conf/tld.pkgs" "i686"
+compress_chroot "tld.x86" "tld.x86"
