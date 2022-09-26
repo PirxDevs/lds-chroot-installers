@@ -2,8 +2,6 @@ FHS
 SysVinit
 bash
 bind-utils
-bnx2-firmware
-bnx2x-firmware
 bridge-utils
 bzip2
 ca-certificates
@@ -51,7 +49,6 @@ kernel-5.10
 kmod
 less
 lftp
-linux-firmware
 login
 logrotate
 losetup
@@ -61,8 +58,6 @@ man-db
 man-pages
 mc
 mdadm
-microcode-data-amd
-microcode-data-intel
 mingetty
 mtr
 openssh-clients
