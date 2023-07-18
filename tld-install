@@ -49,12 +49,12 @@ cachedir = ${build_root}/tmp/poldek
 [source]
 type   = pndir
 name   = tld
-path   = http://ftp1.tld-linux.org/TLD/stable/main/${3}/RPMS/
+path   = http://dist.tld-linux.org/TLD/stable/main/${3}/RPMS/
 
 [source]
 type   = pndir
 name   = tld
-path   = http://ftp1.tld-linux.org/TLD/stable/main/noarch/RPMS/
+path   = http://dist.tld-linux.org/TLD/stable/main/noarch/RPMS/
 EOF
   echo "Updating poldek indexes"
   rm -rf ${build_root}/tmp/poldek/*
