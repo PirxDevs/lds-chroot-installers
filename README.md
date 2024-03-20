@@ -4,3 +4,4 @@ Chroot installation scripts used to create system images for
 * tld-install must be run on TLD Linux
 * pld-install must be run on PLD Linux
 * deb-install may be run on any Linux with debootstrap installed
+* rhc-install must be run on RedHat compatible system
