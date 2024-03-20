@@ -1,0 +1,83 @@
+#!/bin/bash
+
+# Copyright (C) 2018-2024 Pirx Developers - https://pirx.dev/
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+script_path=$(realpath "${0}")
+build_root=$(dirname "${script_path}")
+mkdir -p "${build_root}"/{chroots,logs,tmp} 1>/dev/null 2>&1
+
+. /etc/os-release
+
+bind_mounts () {
+  for mpoint in "/dev" "/dev/pts" "/proc" "/run" "/sys"; do
+    if ! test -d ${1}/${mpoint}; then
+      mkdir ${1}/${mpoint}
+    fi
+    mount ${mpoint} ${1}/${mpoint} -o bind
+  done
+}
+
+bind_umounts () {
+  for mpoint in "/dev/pts" "/dev" "/proc" "/run" "/sys"; do
+    umount ${1}/${mpoint}
+  done
+}
+
+install_rhc_chroot () {
+  chroot_dir="${build_root}/chroots/${1}"
+  rm -rf "${chroot_dir}"
+  mkdir "${chroot_dir}"
+  echo "Running installation"
+  bind_mounts ${chroot_dir}
+  dnf -y --setopt=install_weak_deps=False --releasever="${3}" --installroot=${chroot_dir} install $(cat ${2} | grep -v -E "^#" 2>/dev/null) 2>&1 | tee -a ${build_root}/logs/${1}.install.log
+  if [ $? -ne 0 ]; then
+    echo "Error: installation has failed"
+    bind_umounts ${chroot_dir}
+    exit 1
+  fi
+  rm -f ${chroot_dir}/etc/localtime 1>/dev/null 2>&1
+  ln -s /usr/share/zoneinfo/UTC ${chroot_dir}/etc/localtime 1>/dev/null 2>&1
+  mkdir ${chroot_dir}/root/tmp 1>/dev/null 2>&1
+  chmod 700 ${chroot_dir}/root/tmp 1>/dev/null 2>&1
+  chroot ${chroot_dir} dnf -y remove linux-firmware 1>/dev/null 2>&1
+  chroot ${chroot_dir} yum clean 1>/dev/null 2>&1
+  cat > ${chroot_dir}/etc/default/grub << EOF
+GRUB_TIMEOUT=5
+GRUB_DISTRIBUTOR="$(sed 's, release .*$,,g' /etc/system-release)"
+GRUB_DEFAULT=saved
+GRUB_DISABLE_SUBMENU=true
+GRUB_TERMINAL_OUTPUT="console"
+GRUB_CMDLINE_LINUX="crashkernel=1G-4G:192M,4G-64G:256M,64G-:512M"
+GRUB_DISABLE_RECOVERY="true"
+GRUB_ENABLE_BLSCFG=false
+EOF
+  chown root:root ${chroot_dir}/etc/default/grub 1>/dev/null 2>&1
+  chmod 644 ${chroot_dir}/etc/default/grub 1>/dev/null 2>&1
+  rm -f ${chroot_dir}/dev/null ${chroot_dir}/boot/initramfs* ${chroot_dir}/boot/loader/entries/* 1>/dev/null 2>&1
+  bind_umounts ${chroot_dir}
+  echo -n "" > ${chroot_dir}/etc/resolv.conf
+}
+
+compress_chroot () {
+  echo "Compressing chroot ${1} into ${2}.tar.xz"
+  chroot_dir="${build_root}/chroots"
+  rm -f "${chroot_dir}/${2}.tar.xz"
+  cd "${chroot_dir}/${1}"
+  tar Jcf "${chroot_dir}/${2}.tar.xz" * --numeric-owner
+  cd "${build_root}"
+}
+
+install_rhc_chroot "${ID}${VERSION_ID%.*}.x64" "conf/${ID}${VERSION_ID%.*}.pkgs" "${VERSION_ID}"
+compress_chroot "${ID}${VERSION_ID%.*}.x64" "${ID}${VERSION_ID%.*}.x64"
