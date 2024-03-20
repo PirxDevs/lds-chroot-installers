@@ -65,8 +65,9 @@ GRUB_ENABLE_BLSCFG=false
 EOF
   chown root:root ${chroot_dir}/etc/default/grub 1>/dev/null 2>&1
   chmod 644 ${chroot_dir}/etc/default/grub 1>/dev/null 2>&1
-  rm -f ${chroot_dir}/dev/null ${chroot_dir}/boot/initramfs* ${chroot_dir}/boot/loader/entries/* 1>/dev/null 2>&1
+  rm -f ${chroot_dir}/boot/initramfs* ${chroot_dir}/boot/loader/entries/* 1>/dev/null 2>&1
   bind_umounts ${chroot_dir}
+  rm -f ${chroot_dir}/dev/null 1>/dev/null 2>&1
   echo -n "" > ${chroot_dir}/etc/resolv.conf
 }
 
