@@ -52,7 +52,7 @@ install_rhc_chroot () {
   mkdir ${chroot_dir}/root/tmp 1>/dev/null 2>&1
   chmod 700 ${chroot_dir}/root/tmp 1>/dev/null 2>&1
   chroot ${chroot_dir} dnf -y remove linux-firmware 1>/dev/null 2>&1
-  chroot ${chroot_dir} yum clean 1>/dev/null 2>&1
+  chroot ${chroot_dir} dnf clean all 1>/dev/null 2>&1
   cat > ${chroot_dir}/etc/default/grub << EOF
 GRUB_TIMEOUT=5
 GRUB_DISTRIBUTOR="$(sed 's, release .*$,,g' /etc/system-release)"
