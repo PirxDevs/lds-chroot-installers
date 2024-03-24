@@ -75,8 +75,8 @@ EOF
   chroot ${chroot_dir} rpm --rebuilddb
   echo "nameserver 8.8.8.8" > ${chroot_dir}/etc/resolv.conf
   ln -s /usr/share/zoneinfo/Etc/UTC ${chroot_dir}/etc/localtime
-  chroot ${chroot_dir} poldek --noask --install -v $(cat ${2} | grep -v -E "^#" 2>/dev/null) 2>&1 | tee -a ${build_root}/logs/pld.${3}.poldek-install.log
   chroot ${chroot_dir} poldek --noask --upgrade --force -v shadow 2>&1 | tee -a ${build_root}/logs/pld.${3}.poldek-install.log
+  chroot ${chroot_dir} poldek --noask --install -v $(cat ${2} | grep -v -E "^#" 2>/dev/null) 2>&1 | tee -a ${build_root}/logs/pld.${3}.poldek-install.log
   bind_umounts ${chroot_dir}
   chroot ${chroot_dir} poldek --noask --upgrade --force -v udev 2>&1 | tee -a ${build_root}/logs/pld.${3}.poldek-install.log
   chroot ${chroot_dir} usermod -s /bin/bash root 1>/dev/null 2>&1
